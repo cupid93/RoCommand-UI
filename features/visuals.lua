@@ -25,9 +25,6 @@ local function CreateESP(player)
         Tool = Drawing.new("Text"),
         Tracer = Drawing.new("Line"),
         Distance = Drawing.new("Text"),
-        Character = nil,
-        Humanoid = nil,
-        RootPart = nil,
     }
 
     obj.Box.Visible = false
@@ -82,18 +79,6 @@ local function CreateESP(player)
     obj.Distance.ZIndex = 44
 
     ESPObjects[player] = obj
-
-    local function onCharacterAdded(char)
-        obj.Character = char
-        obj.Humanoid = char:WaitForChild("Humanoid", 5)
-        obj.RootPart = char:WaitForChild("HumanoidRootPart", 5)
-    end
-
-    if player.Character then
-        onCharacterAdded(player.Character)
-    end
-
-    player.CharacterAdded:Connect(onCharacterAdded)
 end
 
 local function RemoveESP(player)
@@ -171,9 +156,9 @@ RunService.RenderStepped:Connect(function()
     end
 
     for player, obj in pairs(ESPObjects) do
-        local char = obj.Character
-        local hum = obj.Humanoid
-        local root = obj.RootPart
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
 
         obj.Box.Visible = false
         obj.HealthbarBG.Visible = false
@@ -184,7 +169,7 @@ RunService.RenderStepped:Connect(function()
         obj.Distance.Visible = false
 
         if not char or not hum or not root then continue end
-        if hum.Health <= 0 then continue end
+        if hum.Health <= 0 or hum.MaxHealth <= 0 then continue end
 
         if Toggles.TeamCheck then
             if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
