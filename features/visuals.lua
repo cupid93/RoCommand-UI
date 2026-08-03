@@ -140,26 +140,8 @@ end
 
 RunService.RenderStepped:Connect(function()
     local camera = GetCamera()
-    if not camera then return end
 
-    if not Toggles.ESPEnabled then
-        for _, obj in pairs(ESPObjects) do
-            obj.Box.Visible = false
-            obj.HealthbarBG.Visible = false
-            obj.Healthbar.Visible = false
-            obj.Name.Visible = false
-            obj.Tool.Visible = false
-            obj.Tracer.Visible = false
-            obj.Distance.Visible = false
-        end
-        return
-    end
-
-    for player, obj in pairs(ESPObjects) do
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-
+    for _, obj in pairs(ESPObjects) do
         obj.Box.Visible = false
         obj.HealthbarBG.Visible = false
         obj.Healthbar.Visible = false
@@ -167,6 +149,15 @@ RunService.RenderStepped:Connect(function()
         obj.Tool.Visible = false
         obj.Tracer.Visible = false
         obj.Distance.Visible = false
+    end
+
+    if not Toggles.ESPEnabled then return end
+    if not camera then return end
+
+    for player, obj in pairs(ESPObjects) do
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
 
         if not char or not hum or not root then continue end
         if hum.Health <= 0 or hum.MaxHealth <= 0 then continue end
