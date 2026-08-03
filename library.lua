@@ -416,6 +416,126 @@ function library:new(props)
 	return window
 end
 --
+function library:sidewindow(props)
+	local name = props.name or props.Name or "Side"
+	local width = props.width or props.Width or 220
+	local height = props.height or props.Height or 400
+	local side = (props.side or props.Side or "right"):lower() -- "left" or "right"
+	local color = props.color or props.Color or self.theme.accent
+
+	local sidewin = {}
+
+	local outline = utility.new("Frame", {
+		AnchorPoint = Vector2.new(side == "left" and 1 or 0, 0.5),
+		BackgroundColor3 = color,
+		BorderColor3 = Color3.fromRGB(12, 12, 12),
+		BorderSizePixel = 1,
+		Size = UDim2.new(0, width, 0, height),
+		Position = UDim2.new(0.5, side == "left" and -260 or 260, 0.5, 0),
+		Parent = self.screen
+	})
+
+	table.insert(self.themeitems["accent"]["BackgroundColor3"], outline)
+
+	local outline2 = utility.new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		BorderColor3 = Color3.fromRGB(12, 12, 12),
+		BorderSizePixel = 1,
+		Size = UDim2.new(1, -4, 1, -4),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Parent = outline
+	})
+
+	local indent = utility.new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		BorderColor3 = Color3.fromRGB(56, 56, 56),
+		BorderMode = "Inset",
+		BorderSizePixel = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Parent = outline2
+	})
+
+	local title = utility.new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 20),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		Parent = outline2
+	})
+
+	local titletext = utility.new("TextLabel", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -10, 1, 0),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		Font = self.font,
+		Text = name,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextXAlignment = "Left",
+		TextSize = self.textsize,
+		TextStrokeTransparency = 0,
+		Parent = title
+	})
+
+	local main = utility.new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 1),
+		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+		BorderColor3 = Color3.fromRGB(56, 56, 56),
+		BorderMode = "Inset",
+		BorderSizePixel = 1,
+		Size = UDim2.new(1, -10, 1, -25),
+		Position = UDim2.new(0.5, 0, 1, -5),
+		Parent = outline2
+	})
+
+	local content = utility.new("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.new(1, -10, 1, -10),
+		Position = UDim2.new(0, 5, 0, 5),
+		AutomaticCanvasSize = "Y",
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80),
+		Parent = main
+	})
+
+	utility.new("UIListLayout", {
+		FillDirection = "Vertical",
+		Padding = UDim.new(0, 6),
+		Parent = content
+	})
+
+	utility.dragify(title, outline)
+
+	-- Keep side window attached when main window moves
+	local connection
+	connection = self.outline:GetPropertyChangedSignal("Position"):Connect(function()
+		local mainPos = self.outline.AbsolutePosition
+		local mainSize = self.outline.AbsoluteSize
+
+		if side == "left" then
+			outline.Position = UDim2.new(0, mainPos.X - width - 8, 0, mainPos.Y + (mainSize.Y - height) / 2)
+		else
+			outline.Position = UDim2.new(0, mainPos.X + mainSize.X + 8, 0, mainPos.Y + (mainSize.Y - height) / 2)
+		end
+	end)
+
+	sidewin = {
+		outline = outline,
+		content = content,
+		title = titletext,
+		connection = connection
+	}
+
+	self.labels[#self.labels + 1] = titletext
+	setmetatable(sidewin, {__index = sections}) -- so you can use :toggle, :slider etc directly
+
+	return sidewin
+end
 function library:watermark()
 	local watermark = {}
 	--
