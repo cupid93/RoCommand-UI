@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 local Toggles = getgenv().Toggles
@@ -8,6 +7,14 @@ local Options = getgenv().Options
 
 local ESP = {}
 local ESPObjects = {}
+
+local function GetCamera()
+    local camera = workspace.CurrentCamera
+    if camera and camera.Parent then
+        return camera
+    end
+    return nil
+end
 
 local function CreateESP(player)
     local obj = {
@@ -117,6 +124,9 @@ end)
 Players.PlayerRemoving:Connect(RemoveESP)
 
 local function GetBounds(char)
+    local camera = GetCamera()
+    if not camera then return end
+
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
@@ -126,8 +136,8 @@ local function GetBounds(char)
     local topPos = (head and head.Position) or root.Position + Vector3.new(0, 3, 0)
     local bottomPos = root.Position - Vector3.new(0, 3, 0)
 
-    local top, topOnScreen = Camera:WorldToViewportPoint(topPos)
-    local bottom, bottomOnScreen = Camera:WorldToViewportPoint(bottomPos)
+    local top, topOnScreen = camera:WorldToViewportPoint(topPos)
+    local bottom, bottomOnScreen = camera:WorldToViewportPoint(bottomPos)
 
     if not topOnScreen and not bottomOnScreen then return end
 
@@ -144,6 +154,9 @@ local function GetBounds(char)
 end
 
 RunService.RenderStepped:Connect(function()
+    local camera = GetCamera()
+    if not camera then return end
+
     if not Toggles.ESPEnabled then
         for _, obj in pairs(ESPObjects) do
             obj.Box.Visible = false
@@ -182,7 +195,7 @@ RunService.RenderStepped:Connect(function()
         local bounds = GetBounds(char)
         if not bounds then continue end
 
-        local distance = math.round((root.Position - Camera.CFrame.Position).Magnitude)
+        local distance = math.round((root.Position - camera.CFrame.Position).Magnitude)
 
         if Toggles.Box then
             obj.Box.Color = Options.BoxColor
@@ -227,7 +240,7 @@ RunService.RenderStepped:Connect(function()
 
         if Toggles.Tracers then
             obj.Tracer.Color = Options.TracerColor
-            obj.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+            obj.Tracer.From = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y)
             obj.Tracer.To = bounds.Bottom
             obj.Tracer.Visible = true
         end
