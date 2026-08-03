@@ -418,20 +418,19 @@ end
 --
 function library:sidewindow(props)
 	local name = props.name or props.Name or "Side"
-	local width = props.width or props.Width or 220
-	local height = props.height or props.Height or 400
+	local width = props.width or props.Width or 200
+	local height = props.height or props.Height or 450
 	local side = (props.side or props.Side or "right"):lower() -- "left" or "right"
-	local color = props.color or props.Color or self.theme.accent
+	local gap = props.gap or 8 -- space between main window and side window
 
 	local sidewin = {}
 
 	local outline = utility.new("Frame", {
-		AnchorPoint = Vector2.new(side == "left" and 1 or 0, 0.5),
-		BackgroundColor3 = color,
+		BackgroundColor3 = self.theme.accent,
 		BorderColor3 = Color3.fromRGB(12, 12, 12),
 		BorderSizePixel = 1,
 		Size = UDim2.new(0, width, 0, height),
-		Position = UDim2.new(0.5, side == "left" and -260 or 260, 0.5, 0),
+		Position = UDim2.new(0, 0, 0, 0),
 		Parent = self.screen
 	})
 
@@ -445,17 +444,6 @@ function library:sidewindow(props)
 		Size = UDim2.new(1, -4, 1, -4),
 		Position = UDim2.new(0.5, 0, 0.5, 0),
 		Parent = outline
-	})
-
-	local indent = utility.new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		BorderColor3 = Color3.fromRGB(56, 56, 56),
-		BorderMode = "Inset",
-		BorderSizePixel = 1,
-		Size = UDim2.new(1, 0, 1, 0),
-		Position = UDim2.new(0.5, 0, 0.5, 0),
-		Parent = outline2
 	})
 
 	local title = utility.new("Frame", {
@@ -509,30 +497,41 @@ function library:sidewindow(props)
 		Parent = content
 	})
 
-	utility.dragify(title, outline)
-
-	-- Keep side window attached when main window moves
-	local connection
-	connection = self.outline:GetPropertyChangedSignal("Position"):Connect(function()
+	-- Function that keeps the side window locked next to the main window
+	local function updatePosition()
 		local mainPos = self.outline.AbsolutePosition
 		local mainSize = self.outline.AbsoluteSize
 
+		local y = mainPos.Y + (mainSize.Y - height) / 2
+
 		if side == "left" then
-			outline.Position = UDim2.new(0, mainPos.X - width - 8, 0, mainPos.Y + (mainSize.Y - height) / 2)
+			outline.Position = UDim2.new(0, mainPos.X - width - gap, 0, y)
 		else
-			outline.Position = UDim2.new(0, mainPos.X + mainSize.X + 8, 0, mainPos.Y + (mainSize.Y - height) / 2)
+			outline.Position = UDim2.new(0, mainPos.X + mainSize.X + gap, 0, y)
 		end
-	end)
+	end
+
+	-- Initial position
+	updatePosition()
+
+	-- Follow the main window whenever it moves
+	local connection = self.outline:GetPropertyChangedSignal("Position"):Connect(updatePosition)
+
+	-- Also update when the main window is resized (rare, but safe)
+	local sizeConnection = self.outline:GetPropertyChangedSignal("Size"):Connect(updatePosition)
 
 	sidewin = {
 		outline = outline,
 		content = content,
 		title = titletext,
-		connection = connection
+		connection = connection,
+		sizeConnection = sizeConnection
 	}
 
 	self.labels[#self.labels + 1] = titletext
-	setmetatable(sidewin, {__index = sections}) -- so you can use :toggle, :slider etc directly
+
+	-- Allow using normal elements on the side window
+	setmetatable(sidewin, {__index = sections})
 
 	return sidewin
 end
