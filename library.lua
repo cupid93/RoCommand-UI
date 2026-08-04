@@ -984,6 +984,198 @@ function library:settextsize(size)
 	end
 end
 --
+function library:login(props)
+	-- // properties
+	local url = props.url or props.Url or "https://rocommand.tech/users.json"
+	local title = props.title or props.Title or props.name or "rocommand.tech"
+	local color = props.color or props.Color or props.accent or Color3.fromRGB(225, 58, 81)
+	local font = props.font or props.Font or "RobotoMono"
+	local textsize = props.textsize or 12
+	-- // variables
+	local loggedin = false
+	local done = false
+	local sleep = task and task.wait or wait
+	-- // main
+	local screen = utility.new(
+		"ScreenGui",
+		{
+			Name = tostring(math.random(0,999999))..tostring(math.random(0,999999)),
+			DisplayOrder = 9999,
+			ResetOnSpawn = false,
+			ZIndexBehavior = "Global",
+			Parent = cre
+		}
+	)
+	if check_exploit == "Synapse" and syn and syn.protect_gui then
+		syn.protect_gui(screen)
+	end
+	local outline = utility.new(
+		"Frame",
+		{
+			AnchorPoint = Vector2.new(0.5,0.5),
+			BackgroundColor3 = color,
+			BorderColor3 = Color3.fromRGB(12, 12, 12),
+			BorderSizePixel = 1,
+			Size = UDim2.new(0,340,0,245),
+			Position = UDim2.new(0.5,0,0.5,0),
+			Parent = screen
+		}
+	)
+	local inner = utility.new(
+		"Frame",
+		{
+			AnchorPoint = Vector2.new(0.5,0.5),
+			BackgroundColor3 = Color3.fromRGB(20, 20, 20),
+			BorderColor3 = Color3.fromRGB(56, 56, 56),
+			BorderMode = "Inset",
+			BorderSizePixel = 1,
+			Size = UDim2.new(1,-4,1,-4),
+			Position = UDim2.new(0.5,0,0.5,0),
+			Parent = outline
+		}
+	)
+	local header = utility.new(
+		"TextLabel",
+		{
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1,0,0,34),
+			Font = font,
+			Text = title,
+			TextColor3 = Color3.fromRGB(255,255,255),
+			TextSize = textsize + 4,
+			TextStrokeTransparency = 0,
+			Parent = inner
+		}
+	)
+	local usernamebox = utility.new(
+		"TextBox",
+		{
+			BackgroundColor3 = Color3.fromRGB(24, 24, 24),
+			BorderColor3 = Color3.fromRGB(56, 56, 56),
+			BorderMode = "Inset",
+			BorderSizePixel = 1,
+			Position = UDim2.new(0,14,0,44),
+			Size = UDim2.new(1,-28,0,28),
+			Font = font,
+			PlaceholderColor3 = Color3.fromRGB(120,120,120),
+			PlaceholderText = "Username",
+			Text = "",
+			TextColor3 = Color3.fromRGB(255,255,255),
+			TextSize = textsize,
+			TextXAlignment = "Left",
+			ClearTextOnFocus = false,
+			Parent = inner
+		}
+	)
+	local passwordbox = utility.new(
+		"TextBox",
+		{
+			BackgroundColor3 = Color3.fromRGB(24, 24, 24),
+			BorderColor3 = Color3.fromRGB(56, 56, 56),
+			BorderMode = "Inset",
+			BorderSizePixel = 1,
+			Position = UDim2.new(0,14,0,80),
+			Size = UDim2.new(1,-28,0,28),
+			Font = font,
+			PlaceholderColor3 = Color3.fromRGB(120,120,120),
+			PlaceholderText = "Password",
+			Text = "",
+			TextColor3 = Color3.fromRGB(255,255,255),
+			TextSize = textsize,
+			TextXAlignment = "Left",
+			ClearTextOnFocus = false,
+			Parent = inner
+		}
+	)
+	local status = utility.new(
+		"TextLabel",
+		{
+			BackgroundTransparency = 1,
+			Position = UDim2.new(0,14,0,114),
+			Size = UDim2.new(1,-28,0,22),
+			Font = font,
+			Text = "",
+			TextColor3 = Color3.fromRGB(255,100,100),
+			TextSize = textsize - 1,
+			TextXAlignment = "Left",
+			TextWrapped = true,
+			Parent = inner
+		}
+	)
+	local loginbtn = utility.new(
+		"TextButton",
+		{
+			BackgroundColor3 = color,
+			BorderColor3 = Color3.fromRGB(12, 12, 12),
+			BorderSizePixel = 1,
+			Position = UDim2.new(0,14,0,150),
+			Size = UDim2.new(1,-28,0,30),
+			Font = font,
+			Text = "Login",
+			TextColor3 = Color3.fromRGB(255,255,255),
+			TextSize = textsize,
+			AutoButtonColor = true,
+			Parent = inner
+		}
+	)
+	local function attempt()
+		local user = usernamebox.Text
+		local pass = passwordbox.Text
+		if user == "" or pass == "" then
+			status.Text = "Enter a username and password."
+			return
+		end
+		status.Text = "Checking..."
+		loginbtn.Text = "Checking..."
+		local ok, data = pcall(function()
+			return game:HttpGet(url)
+		end)
+		if not ok then
+			ok, data = pcall(function()
+				return hs:GetAsync(url)
+			end)
+		end
+		if not ok then
+			ok, data = pcall(function()
+				return HttpGet(url)
+			end)
+		end
+		if not ok then
+			status.Text = "Failed to reach auth server."
+			loginbtn.Text = "Login"
+			return
+		end
+		local decok, decoded = pcall(function()
+			return hs:JSONDecode(data)
+		end)
+		if not decok or type(decoded) ~= "table" then
+			status.Text = "Auth server returned bad data."
+			loginbtn.Text = "Login"
+			return
+		end
+		local users = decoded.users or decoded
+		local entry = users[user]
+		local expected = entry
+		if type(entry) == "table" then
+			expected = entry.password or entry.pass
+		end
+		if expected and expected == pass then
+			loggedin = true
+			done = true
+		else
+			status.Text = "Invalid username or password."
+			loginbtn.Text = "Login"
+		end
+	end
+	loginbtn.MouseButton1Click:Connect(attempt)
+	-- // block until the user logs in or the script moves on
+	while not done do
+		sleep()
+	end
+	screen:Destroy()
+	return loggedin
+end
+--
 function library:page(props)
 	-- // properties
 	local name = props.name or props.Name or props.page or props.Page or props.pagename or props.Pagename or props.PageName or props.pageName or "new ui"
