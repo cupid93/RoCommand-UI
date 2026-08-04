@@ -84,10 +84,10 @@ end
 -- ═══════════════════════════════════════════════
 -- GLOBAL STATE
 -- ═══════════════════════════════════════════════
-_G.EquippedData = _G.EquippedData or {}
+getgenv().EquippedData = getgenv().EquippedData or {}
 for weapon in pairs(SkinLists) do
-    if not _G.EquippedData[weapon] then
-        _G.EquippedData[weapon] = {Skin = "Default", Wrap = "None"}
+    if not getgenv().EquippedData[weapon] then
+        getgenv().EquippedData[weapon] = {Skin = "Default", Wrap = "None"}
     end
 end
 
@@ -206,8 +206,8 @@ local function Install()
             if not Toggles.SkinChanger then return oldGetWrap(self) end
             local ok, result = pcall(function()
                 local weaponName = self.ClientItem and self.ClientItem.Name
-                if weaponName and _G.EquippedData[weaponName] then
-                    local wrapName = _G.EquippedData[weaponName].Wrap
+                if weaponName and getgenv().EquippedData[weaponName] then
+                    local wrapName = getgenv().EquippedData[weaponName].Wrap
                     if wrapName and wrapName ~= "None" then
                         return getCosmeticData(wrapName, "Wrap")
                     end
@@ -226,7 +226,7 @@ local function Install()
                 if not clientItem then return end
                 local weaponName = clientItem.Name
                 if not weaponName then return end
-                local info = _G.EquippedData[weaponName]
+                local info = getgenv().EquippedData[weaponName]
                 if not info then return end
                 local cf = rawget(clientItem, "ClientFighter")
                     or (pcall(function() return clientItem.ClientFighter end) and clientItem.ClientFighter)
@@ -293,7 +293,7 @@ local function SetSelection(weapon, skin, wrap)
     skin = skin or "Default"
     wrap = wrap or "None"
     if SkinLists[weapon] then
-        _G.EquippedData[weapon] = {Skin = skin, Wrap = wrap}
+        getgenv().EquippedData[weapon] = {Skin = skin, Wrap = wrap}
     end
     if Toggles.SkinChanger and CosmeticLibrary and skin ~= "Default" then
         pcall(function()
@@ -303,19 +303,19 @@ local function SetSelection(weapon, skin, wrap)
 end
 
 local function GetEquipped(weapon)
-    return _G.EquippedData[weapon] or {Skin = "Default", Wrap = "None"}
+    return getgenv().EquippedData[weapon] or {Skin = "Default", Wrap = "None"}
 end
 
 local function ClearAll()
     for weapon in pairs(SkinLists) do
-        _G.EquippedData[weapon] = {Skin = "Default", Wrap = "None"}
+        getgenv().EquippedData[weapon] = {Skin = "Default", Wrap = "None"}
     end
 end
 
 local function GetAssignments()
     local lines = {}
     for _, weapon in ipairs(Weapons) do
-        local info = _G.EquippedData[weapon] or {Skin = "Default", Wrap = "None"}
+        local info = getgenv().EquippedData[weapon] or {Skin = "Default", Wrap = "None"}
         if info.Skin ~= "Default" or (info.Wrap and info.Wrap ~= "None") then
             lines[#lines + 1] = weapon .. ": " .. info.Skin .. (info.Wrap and info.Wrap ~= "None" and (" [" .. info.Wrap .. "]") or "")
         end
