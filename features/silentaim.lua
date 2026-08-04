@@ -18,9 +18,10 @@ FOVCircle.Visible = false
 FOVCircle.ZIndex = 999
 FOVCircle.Transparency = 0
 
-local Utility = nil
-local OriginalRaycast = nil
+local Modules = nil
 local Installed = false
+local OriginalStartShooting = nil
+local CurrentTarget = nil
 
 local function GetPing()
     local ping = Stats.Network.ServerStatsItem:FindFirstChild("Ping")
@@ -67,60 +68,77 @@ local function GetTarget()
     return best
 end
 
--- // hook the game's own Utility.Raycast so bullets redirect without touching
--- // workspace:Raycast (avoids the module honeypot). Resolved lazily.
+-- // RIVALS: rewrite the shot's aim CFrame inside the fired payload
+local function BuildShotPayload(origin, target, part)
+    if not Modules or not Modules.Utility or type(Modules.Utility.EncodeCFrame) ~= "function" then
+        return nil
+    end
+
+    local shot_offset_cf = Modules.Utility:EncodeCFrame(CFrame.new(0.43, 0.25, 0.42))
+    local aim_cf = Modules.Utility:EncodeCFrame(CFrame.new(origin, target))
+
+    return {
+        [utf8.char(0)] = aim_cf,
+        [utf8.char(1)] = aim_cf,
+        [utf8.char(2)] = part,
+        [utf8.char(3)] = shot_offset_cf,
+    }
+end
+
+-- // hook the game's own Gun.StartShooting so shots redirect to the target.
+-- // Resolved lazily, retried while enabled.
 local function TryInstall()
     if Installed then return true end
 
     pcall(function()
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        Utility = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Utility"))
+        Modules = require(ReplicatedStorage:WaitForChild("Modules"))
     end)
 
-    if not Utility or type(Utility.Raycast) ~= "function" then
-        print("[SilentAim] Utility module not found, retrying while enabled")
+    if not Modules or type(Modules.Gun) ~= "table" or type(Modules.Gun.StartShooting) ~= "function" then
+        print("[SilentAim] Gun module not found, retrying while enabled")
         return false
     end
 
-    OriginalRaycast = Utility.Raycast
-    Utility.Raycast = function(...)
-        local ok, result = pcall(function()
-            local args = { ... }
-            local ray = args[1]
-            local origin, length
-
-            if typeof(ray) == "Ray" then
-                origin = ray.Origin
-                length = ray.Direction.Magnitude
-            elseif typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
-                origin = args[1]
-                length = args[2].Magnitude
-            else
+    OriginalStartShooting = Modules.Gun.StartShooting
+    Modules.Gun.StartShooting = function(self, ...)
+        local ok, results = pcall(function()
+            if not self or not self.ClientFighter or not self.ClientFighter.IsLocalPlayer then
                 return nil
             end
 
-            if Toggles.SilentAim then
-                local target = GetTarget()
-                if target then
-                    local direction = (target.Position - origin).Unit * length
-                    if typeof(ray) == "Ray" then
-                        return OriginalRaycast(Ray.new(origin, direction), table.unpack(args, 2))
-                    end
-                    args[2] = direction
-                    return OriginalRaycast(table.unpack(args))
-                end
+            local target = CurrentTarget
+            if not target or not target.Part or not target.Part.Parent then
+                return nil
             end
-            return nil
+
+            local shot_results = {OriginalStartShooting(self, ...)}
+            if shot_results[1] ~= true or shot_results[2] ~= "StartShooting" then
+                return shot_results
+            end
+
+            local root = LocalPlayer.Character and LocalPlayer.Character.PrimaryPart
+            if not root then
+                return shot_results
+            end
+
+            local payload = BuildShotPayload(root.Position, target.Position, target.Part)
+            if not payload then
+                return shot_results
+            end
+
+            shot_results[3] = payload
+            return shot_results
         end)
 
-        if ok and result then
-            return result
+        if ok and type(results) == "table" then
+            return table.unpack(results)
         end
-        return OriginalRaycast(...)
+        return OriginalStartShooting(self, ...)
     end
 
     Installed = true
-    print("[SilentAim] Utility.Raycast hooked")
+    print("[SilentAim] Gun.StartShooting hooked")
     return true
 end
 
@@ -144,10 +162,16 @@ table.insert(Connections, RunService.Heartbeat:Connect(function()
     end
 end))
 
--- // FOV circle
+-- // target tracking + FOV circle
 table.insert(Connections, RunService.RenderStepped:Connect(function()
     pcall(function()
-        if Toggles.SilentAim and Toggles.ShowSilentFOV then
+        if Toggles.SilentAim then
+            CurrentTarget = GetTarget()
+        else
+            CurrentTarget = nil
+        end
+
+        if Toggles.SilentAim and Toggles.ShowSilentFOV and CurrentTarget then
             FOVCircle.Position = Camera.ViewportSize / 2
             FOVCircle.Radius = Options.SilentFOV or 150
             FOVCircle.Color = Options.SilentFOVColor or Color3.fromRGB(33, 150, 243)
@@ -176,9 +200,9 @@ return {
             FOVCircle.Visible = false
             FOVCircle:Remove()
         end)
-        if Installed and Utility and OriginalRaycast then
+        if Installed and Modules and Modules.Gun and OriginalStartShooting then
             pcall(function()
-                Utility.Raycast = OriginalRaycast
+                Modules.Gun.StartShooting = OriginalStartShooting
             end)
         end
     end
