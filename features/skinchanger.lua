@@ -258,32 +258,8 @@ local function Install()
 end
 
 -- ═══════════════════════════════════════════════
--- SYNC SELECTION
+-- ENABLE / RETRY
 -- ═══════════════════════════════════════════════
-local LastApplied = {}
-
-local function SyncSelection()
-    local weapon = Options.SkinWeapon or "Assault Rifle"
-    local skin = Options.SkinSkin or "Default"
-    local wrap = Options.SkinWrap or "None"
-    if not SkinLists[weapon] then return end
-
-    _G.EquippedData[weapon] = {Skin = skin, Wrap = wrap}
-
-    if LastApplied.weapon == weapon and LastApplied.skin == skin and LastApplied.wrap == wrap then
-        return
-    end
-    LastApplied = {weapon = weapon, skin = skin, wrap = wrap}
-
-    if Toggles.SkinChanger and CosmeticLibrary then
-        pcall(function()
-            if skin ~= "Default" then
-                CosmeticLibrary.Equip(weapon, "Skin", skin)
-            end
-        end)
-    end
-end
-
 local function TryEnable()
     local ok = ResolveModules()
     if not ok then
@@ -299,7 +275,6 @@ table.insert(Connections, RunService.Heartbeat:Connect(function()
     local enabled = Toggles.SkinChanger
     if enabled ~= PrevEnabled then
         PrevEnabled = enabled
-        LastApplied = {}
         RetryCount = 0
         if enabled then
             task.spawn(TryEnable)
@@ -310,7 +285,6 @@ table.insert(Connections, RunService.Heartbeat:Connect(function()
         if not Installed and RetryCount % 120 == 0 then
             task.spawn(TryEnable)
         end
-        SyncSelection()
     end
 end))
 
@@ -321,7 +295,11 @@ local function SetSelection(weapon, skin, wrap)
     if SkinLists[weapon] then
         _G.EquippedData[weapon] = {Skin = skin, Wrap = wrap}
     end
-    LastApplied = {}
+    if Toggles.SkinChanger and CosmeticLibrary and skin ~= "Default" then
+        pcall(function()
+            CosmeticLibrary.Equip(weapon, "Skin", skin)
+        end)
+    end
 end
 
 local function GetEquipped(weapon)
@@ -332,7 +310,6 @@ local function ClearAll()
     for weapon in pairs(SkinLists) do
         _G.EquippedData[weapon] = {Skin = "Default", Wrap = "None"}
     end
-    LastApplied = {}
 end
 
 local function GetAssignments()
