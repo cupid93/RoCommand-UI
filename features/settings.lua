@@ -1,4 +1,4 @@
--- // settings.lua - runs in main.lua scope (Window, Sections, UnloadScript available)
+-- // settings.lua - wrapped in a function(Window, Sections, UnloadScript) by main.lua
 local Toggles = getgenv().Toggles
 local Options = getgenv().Options
 local Defaults = getgenv().Defaults
@@ -15,6 +15,24 @@ if isfolder and makefolder then
         end
     end)
 end
+
+-- // the library's configloader only selects from existing .cfg files,
+-- // so an empty folder makes Save/Load/Delete crash on a nil selection.
+-- // guarantee at least one config exists before the loader is created.
+pcall(function()
+    if isfolder and isfolder(ConfigFolder) then
+        local hasCfg = false
+        for _, f in ipairs(listfiles(ConfigFolder)) do
+            if f:sub(-4) == ".cfg" then
+                hasCfg = true
+                break
+            end
+        end
+        if not hasCfg then
+            writefile(ConfigFolder .. "default.cfg", Window:saveconfig())
+        end
+    end
+end)
 
 local function NormalizeKey(k)
     if typeof(k) == "table" then
