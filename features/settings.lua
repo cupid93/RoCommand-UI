@@ -7,7 +7,7 @@ local Menu = Sections.Settings.Menu
 local Config = Sections.Settings.Config
 
 -- // make sure the config folder exists
-local ConfigFolder = "Lumia/"
+local ConfigFolder = "rocommand/"
 if isfolder and makefolder then
     pcall(function()
         if not isfolder(ConfigFolder) then
@@ -101,7 +101,7 @@ Menu:toggle({
     callback = function(v)
         Watermark:toggle(v)
         if v then
-            Watermark:update({ ["Lumia"] = "rocommand.tech" })
+            Watermark:update({ ["Rocommand"] = "rocommand.tech" })
         end
     end
 })
