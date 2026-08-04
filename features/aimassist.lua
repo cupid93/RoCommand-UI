@@ -16,7 +16,8 @@ FOVCircle.Transparency = 1
 
 local CurrentTarget = nil
 local HoldingKey = false
-local Connections = getgenv().Connections
+local Connections = getgenv().Connections or {}
+getgenv().Connections = Connections
 
 -- Keybind hold detection
 table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gp)
