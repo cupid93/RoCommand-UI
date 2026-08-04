@@ -7,6 +7,7 @@ local Options = getgenv().Options
 
 local ESP = {}
 local ESPObjects = {}
+local Connections = getgenv().Connections
 
 local function GetCamera()
     local camera = workspace.CurrentCamera
@@ -100,13 +101,13 @@ for _, player in ipairs(Players:GetPlayers()) do
     end
 end
 
-Players.PlayerAdded:Connect(function(player)
+table.insert(Connections, Players.PlayerAdded:Connect(function(player)
     if player ~= LocalPlayer then
         CreateESP(player)
     end
-end)
+end))
 
-Players.PlayerRemoving:Connect(RemoveESP)
+table.insert(Connections, Players.PlayerRemoving:Connect(RemoveESP))
 
 local function GetBounds(char)
     local camera = GetCamera()
@@ -138,7 +139,7 @@ local function GetBounds(char)
     }
 end
 
-RunService.RenderStepped:Connect(function()
+table.insert(Connections, RunService.RenderStepped:Connect(function()
     local camera = GetCamera()
 
     for _, obj in pairs(ESPObjects) do
@@ -227,6 +228,32 @@ RunService.RenderStepped:Connect(function()
             obj.Distance.Visible = true
         end
     end
-end)
+end))
 
-return ESP
+return {
+    Unload = function()
+        for _, con in ipairs(Connections) do
+            pcall(function()
+                if con and con.Disconnect then
+                    con:Disconnect()
+                end
+            end)
+        end
+        for i = #Connections, 1, -1 do
+            Connections[i] = nil
+        end
+        for _, obj in pairs(ESPObjects) do
+            for _, drawing in pairs(obj) do
+                if type(drawing) == "table" and drawing.Remove then
+                    pcall(function()
+                        drawing.Visible = false
+                        drawing:Remove()
+                    end)
+                end
+            end
+        end
+        for k in pairs(ESPObjects) do
+            ESPObjects[k] = nil
+        end
+    end
+}
