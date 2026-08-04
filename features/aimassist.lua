@@ -16,23 +16,24 @@ FOVCircle.Transparency = 1
 
 local CurrentTarget = nil
 local HoldingKey = false
+local Connections = getgenv().Connections
 
 -- Keybind hold detection
-UserInputService.InputBegan:Connect(function(input, gp)
+table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Options.AimKey then
         HoldingKey = true
     end
-end)
+end))
 
-UserInputService.InputEnded:Connect(function(input)
+table.insert(Connections, UserInputService.InputEnded:Connect(function(input)
     if input.KeyCode == Options.AimKey then
         HoldingKey = false
         if not Toggles.StickyAim then
             CurrentTarget = nil
         end
     end
-end)
+end))
 
 local function IsVisible(part, character)
     local origin = Camera.CFrame.Position
@@ -133,7 +134,7 @@ local function AimAt(part, dt)
 end
 
 -- Main loop
-RunService.RenderStepped:Connect(function(dt)
+table.insert(Connections, RunService.RenderStepped:Connect(function(dt)
     -- FOV Circle
     if Toggles.AimEnabled and Toggles.ShowFOV then
         FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -161,4 +162,25 @@ RunService.RenderStepped:Connect(function(dt)
     if target and part then
         AimAt(part, dt)
     end
-end)
+end))
+
+return {
+    Unload = function()
+        for _, con in ipairs(Connections) do
+            pcall(function()
+                if con and con.Disconnect then
+                    con:Disconnect()
+                end
+            end)
+        end
+        for i = #Connections, 1, -1 do
+            Connections[i] = nil
+        end
+        pcall(function()
+            FOVCircle.Visible = false
+            FOVCircle:Remove()
+        end)
+        CurrentTarget = nil
+        HoldingKey = false
+    end
+}
