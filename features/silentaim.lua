@@ -16,7 +16,7 @@ FOVCircle.NumSides = 64
 FOVCircle.Filled = false
 FOVCircle.Visible = false
 FOVCircle.ZIndex = 999
-FOVCircle.Transparency = 1
+FOVCircle.Transparency = 0
 
 local Utility = nil
 local OriginalRaycast = nil
@@ -152,6 +152,7 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
             FOVCircle.Radius = Options.SilentFOV or 150
             FOVCircle.Color = Options.SilentFOVColor or Color3.fromRGB(33, 150, 243)
             FOVCircle.Thickness = Options.SilentFOVThickness or 1
+            FOVCircle.Transparency = 0
             FOVCircle.Visible = true
         else
             FOVCircle.Visible = false
