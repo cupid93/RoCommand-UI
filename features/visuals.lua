@@ -141,8 +141,6 @@ local function GetBounds(char)
 end
 
 table.insert(Connections, RunService.RenderStepped:Connect(function()
-    local camera = GetCamera()
-
     for _, obj in pairs(ESPObjects) do
         obj.Box.Visible = false
         obj.HealthbarBG.Visible = false
@@ -153,82 +151,86 @@ table.insert(Connections, RunService.RenderStepped:Connect(function()
         obj.Distance.Visible = false
     end
 
-    if not Toggles.ESPEnabled then return end
-    if not camera then return end
+    pcall(function()
+        local camera = GetCamera()
+        if not Toggles.ESPEnabled then return end
+        if not camera then return end
 
-    for player, obj in pairs(ESPObjects) do
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local root = char and char:FindFirstChild("HumanoidRootPart")
+        for player, obj in pairs(ESPObjects) do
+            local char = player.Character
+            if not char or not char.Parent then continue end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local root = char:FindFirstChild("HumanoidRootPart")
 
-        if not char or not hum or not root then continue end
-        if hum.Health <= 0 or hum.MaxHealth <= 0 then continue end
+            if not hum or not root then continue end
+            if hum.Health <= 0 or hum.MaxHealth <= 0 then continue end
 
-        if Toggles.TeamCheck then
-            if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
-                continue
+            if Toggles.TeamCheck then
+                if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
+                    continue
+                end
+            end
+
+            local bounds = GetBounds(char)
+            if not bounds then continue end
+
+            local distance = math.round((root.Position - camera.CFrame.Position).Magnitude)
+
+            if Toggles.Box then
+                obj.Box.Color = Options.BoxColor
+                obj.Box.Thickness = Options.BoxThickness
+                obj.Box.Position = bounds.TopLeft
+                obj.Box.Size = bounds.Size
+                obj.Box.Visible = true
+            end
+
+            if Toggles.Healthbar then
+                local health = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                local healthColor = Color3.fromRGB(
+                    math.clamp(255 * (1 - health) * 2, 0, 255),
+                    math.clamp(255 * health * 2, 0, 255),
+                    0
+                )
+
+                obj.HealthbarBG.Color = Color3.fromRGB(0, 0, 0)
+                obj.HealthbarBG.Position = Vector2.new(bounds.TopLeft.X - 6, bounds.TopLeft.Y)
+                obj.HealthbarBG.Size = Vector2.new(4, bounds.Size.Y)
+                obj.HealthbarBG.Visible = true
+
+                obj.Healthbar.Color = healthColor
+                obj.Healthbar.Position = Vector2.new(bounds.TopLeft.X - 6, bounds.TopLeft.Y + bounds.Size.Y * (1 - health))
+                obj.Healthbar.Size = Vector2.new(4, bounds.Size.Y * health)
+                obj.Healthbar.Visible = true
+            end
+
+            if Toggles.NameTags then
+                obj.Name.Color = Options.NameColor
+                obj.Name.Position = Vector2.new(bounds.TopLeft.X + bounds.Size.X / 2, bounds.TopLeft.Y - 16)
+                obj.Name.Text = player.DisplayName
+                obj.Name.Visible = true
+            end
+
+            if Toggles.Tool then
+                local tool = char:FindFirstChildOfClass("Tool")
+                obj.Tool.Position = Vector2.new(bounds.TopLeft.X + bounds.Size.X / 2, bounds.TopLeft.Y - 4)
+                obj.Tool.Text = tool and tool.Name or "No Tool"
+                obj.Tool.Visible = true
+            end
+
+            if Toggles.Tracers then
+                obj.Tracer.Color = Options.TracerColor
+                obj.Tracer.From = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y)
+                obj.Tracer.To = bounds.Bottom
+                obj.Tracer.Visible = true
+            end
+
+            if Toggles.Distance then
+                obj.Distance.Position = Vector2.new(bounds.TopLeft.X + bounds.Size.X / 2, bounds.Bottom.Y + 4)
+                obj.Distance.Text = tostring(distance) .. " studs"
+                obj.Distance.Visible = true
             end
         end
-
-        local bounds = GetBounds(char)
-        if not bounds then continue end
-
-        local distance = math.round((root.Position - camera.CFrame.Position).Magnitude)
-
-        if Toggles.Box then
-            obj.Box.Color = Options.BoxColor
-            obj.Box.Thickness = Options.BoxThickness
-            obj.Box.Position = bounds.TopLeft
-            obj.Box.Size = bounds.Size
-            obj.Box.Visible = true
-        end
-
-        if Toggles.Healthbar then
-            local health = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-            local healthColor = Color3.fromRGB(
-                math.clamp(255 * (1 - health) * 2, 0, 255),
-                math.clamp(255 * health * 2, 0, 255),
-                0
-            )
-
-            obj.HealthbarBG.Color = Color3.fromRGB(0, 0, 0)
-            obj.HealthbarBG.Position = Vector2.new(bounds.TopLeft.X - 6, bounds.TopLeft.Y)
-            obj.HealthbarBG.Size = Vector2.new(4, bounds.Size.Y)
-            obj.HealthbarBG.Visible = true
-
-            obj.Healthbar.Color = healthColor
-            obj.Healthbar.Position = Vector2.new(bounds.TopLeft.X - 6, bounds.TopLeft.Y + bounds.Size.Y * (1 - health))
-            obj.Healthbar.Size = Vector2.new(4, bounds.Size.Y * health)
-            obj.Healthbar.Visible = true
-        end
-
-        if Toggles.NameTags then
-            obj.Name.Color = Options.NameColor
-            obj.Name.Position = Vector2.new(bounds.TopLeft.X + bounds.Size.X / 2, bounds.TopLeft.Y - 16)
-            obj.Name.Text = player.DisplayName
-            obj.Name.Visible = true
-        end
-
-        if Toggles.Tool then
-            local tool = char:FindFirstChildOfClass("Tool")
-            obj.Tool.Position = Vector2.new(bounds.TopLeft.X + bounds.Size.X / 2, bounds.TopLeft.Y - 4)
-            obj.Tool.Text = tool and tool.Name or "No Tool"
-            obj.Tool.Visible = true
-        end
-
-        if Toggles.Tracers then
-            obj.Tracer.Color = Options.TracerColor
-            obj.Tracer.From = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y)
-            obj.Tracer.To = bounds.Bottom
-            obj.Tracer.Visible = true
-        end
-
-        if Toggles.Distance then
-            obj.Distance.Position = Vector2.new(bounds.TopLeft.X + bounds.Size.X / 2, bounds.Bottom.Y + 4)
-            obj.Distance.Text = tostring(distance) .. " studs"
-            obj.Distance.Visible = true
-        end
-    end
+    end)
 end))
 
 return {
