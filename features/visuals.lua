@@ -7,7 +7,8 @@ local Options = getgenv().Options
 
 local ESP = {}
 local ESPObjects = {}
-local Connections = getgenv().Connections
+local Connections = getgenv().Connections or {}
+getgenv().Connections = Connections
 
 local function GetCamera()
     local camera = workspace.CurrentCamera
