@@ -23,7 +23,11 @@ getgenv().Connections = Connections
 table.insert(Connections, UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Options.AimKey then
-        HoldingKey = true
+        if Toggles.StickyAim and CurrentTarget and not HoldingKey then
+            CurrentTarget = nil
+        else
+            HoldingKey = true
+        end
     end
 end))
 
@@ -65,8 +69,11 @@ local function GetClosestPlayer()
     -- Sticky
     if Toggles.StickyAim and CurrentTarget then
         local char = CurrentTarget.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local part = char and char:FindFirstChild(Options.AimPart)
+        local hum, part
+        if char and char.Parent then
+            hum = char:FindFirstChildOfClass("Humanoid")
+            part = char:FindFirstChild(Options.AimPart)
+        end
 
         if char and hum and hum.Health > 0 and part then
             local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
@@ -87,7 +94,7 @@ local function GetClosestPlayer()
         if IsSameTeam(player) then continue end
 
         local char = player.Character
-        if not char then continue end
+        if not char or not char.Parent then continue end
 
         local hum = char:FindFirstChildOfClass("Humanoid")
         local root = char:FindFirstChild("HumanoidRootPart")
@@ -136,42 +143,47 @@ end
 
 -- Main loop
 table.insert(Connections, RunService.RenderStepped:Connect(function(dt)
-    -- FOV Circle
-    if Toggles.AimEnabled and Toggles.ShowFOV then
-        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        FOVCircle.Radius = Options.FOV
-        FOVCircle.Color = Options.FOVColor
-        FOVCircle.Thickness = Options.FOVThickness
-        FOVCircle.Visible = true
-    else
-        FOVCircle.Visible = false
-    end
+    pcall(function()
+        -- FOV Circle
+        if Toggles.AimEnabled and Toggles.ShowFOV then
+            FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            FOVCircle.Radius = Options.FOV
+            FOVCircle.Color = Options.FOVColor
+            FOVCircle.Thickness = Options.FOVThickness
+            FOVCircle.Visible = true
+        else
+            FOVCircle.Visible = false
+        end
 
-    if not Toggles.AimEnabled then
-        CurrentTarget = nil
-        return
-    end
+        if not Toggles.AimEnabled then
+            CurrentTarget = nil
+            return
+        end
 
-    if not HoldingKey then
-        if Toggles.StickyAim and CurrentTarget then
-            local char = CurrentTarget.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            local part = char and char:FindFirstChild(Options.AimPart)
-            if char and hum and hum.Health > 0 and part then
-                AimAt(part, dt)
+        if not HoldingKey then
+            if Toggles.StickyAim and CurrentTarget then
+                local char = CurrentTarget.Character
+                local hum, part
+                if char and char.Parent then
+                    hum = char:FindFirstChildOfClass("Humanoid")
+                    part = char:FindFirstChild(Options.AimPart)
+                end
+                if char and hum and hum.Health > 0 and part then
+                    AimAt(part, dt)
+                else
+                    CurrentTarget = nil
+                end
             else
                 CurrentTarget = nil
             end
-        else
-            CurrentTarget = nil
+            return
         end
-        return
-    end
 
-    local target, part = GetClosestPlayer()
-    if target and part then
-        AimAt(part, dt)
-    end
+        local target, part = GetClosestPlayer()
+        if target and part then
+            AimAt(part, dt)
+        end
+    end)
 end))
 
 return {
