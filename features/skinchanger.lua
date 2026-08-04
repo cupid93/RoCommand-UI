@@ -154,7 +154,7 @@ local function robust_require(module)
 end
 
 local function ResolveModules()
-    if Resolved or Resolving then return false end
+    if Resolved or Resolving then return Resolved end
     Resolving = true
     local ok = pcall(function()
         CosmeticLibrary = robust_require(ReplicatedStorage:WaitForChild("Modules", 20):WaitForChild("CosmeticLibrary", 20))
@@ -165,7 +165,12 @@ local function ResolveModules()
     end)
     Resolving = false
     Resolved = true
-    return ok and CosmeticLibrary ~= nil and ClientViewModel ~= nil
+    print("[SkinChanger] resolve pcall=" .. tostring(ok)
+        .. " CosmeticLibrary=" .. tostring(CosmeticLibrary ~= nil)
+        .. " ItemLibrary=" .. tostring(ItemLibrary ~= nil)
+        .. " ReplicatedClass=" .. tostring(ReplicatedClass ~= nil)
+        .. " ClientViewModel=" .. tostring(ClientViewModel ~= nil))
+    return Resolved
 end
 
 local function getCosmeticData(name, cType)
@@ -248,6 +253,7 @@ local function Install()
     end
 
     Installed = true
+    print("[SkinChanger] hooks installed: GetWrap=" .. tostring(oldGetWrap ~= nil) .. " .new=" .. tostring(oldNew ~= nil))
     return true
 end
 
@@ -278,20 +284,32 @@ local function SyncSelection()
     end
 end
 
+local function TryEnable()
+    local ok = ResolveModules()
+    if not ok then
+        print("[SkinChanger] module resolution failed, will retry while enabled")
+        return
+    end
+    Install()
+end
+
 local PrevEnabled = nil
+local RetryCount = 0
 table.insert(Connections, RunService.Heartbeat:Connect(function()
     local enabled = Toggles.SkinChanger
     if enabled ~= PrevEnabled then
         PrevEnabled = enabled
         LastApplied = {}
+        RetryCount = 0
         if enabled then
-            task.spawn(function()
-                ResolveModules()
-                Install()
-            end)
+            task.spawn(TryEnable)
         end
     end
     if enabled then
+        RetryCount = RetryCount + 1
+        if not Installed and RetryCount % 120 == 0 then
+            task.spawn(TryEnable)
+        end
         SyncSelection()
     end
 end))
