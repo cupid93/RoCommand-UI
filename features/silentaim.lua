@@ -96,43 +96,49 @@ end
 -- // Layer 1 (primary): hook engine raycasts via __namecall.
 -- // This catches Utility.Raycast (which calls workspace:Raycast internally)
 -- // without requiring any game module, so it can't trip the module honeypot.
+-- // The hook body is wrapped in pcall so it can never throw an error that
+-- // gets attributed to the game's own scripts.
 local installed = false
 local oldNamecall
 local InHook = false
 
 if hookmetamethod and getnamecallmethod then
     local ok, nm = pcall(hookmetamethod, game, "__namecall", function(...)
-        local args = {...}
-        local self = args[1]
-        local method = getnamecallmethod()
+        local okRedirect, newArgs = pcall(function()
+            local args = {...}
+            local self = args[1]
+            if self ~= workspace then return nil end
 
-        if self == workspace
-            and not InHook
-            and not IsOurCall()
-            and Toggles.SilentAim
-            and IsFiring()
-            and ShouldRedirect()
-        then
+            local method = getnamecallmethod()
             local isRaycast = method == "Raycast"
             local isRay = method == "FindPartOnRay"
                 or method == "FindPartOnRayWithIgnoreList"
                 or method == "FindPartOnRayWithWhitelist"
+            if not (isRaycast or isRay) then return nil end
 
-            if isRaycast or isRay then
-                InHook = true
-                local part = GetTargetPart()
-                InHook = false
-
-                if part then
-                    if isRaycast and type(args[2]) == "Vector3" then
-                        args[3] = (part.Position - args[2]).Unit * 1000
-                    elseif isRay and typeof(args[2]) == "Ray" then
-                        args[2] = Ray.new(args[2].Origin, (part.Position - args[2].Origin).Unit * 1000)
-                    end
-                end
+            if InHook or IsOurCall() then return nil end
+            if not Toggles.SilentAim or not IsFiring() or not ShouldRedirect() then
+                return nil
             end
-        end
 
+            InHook = true
+            local okTarget, part = pcall(GetTargetPart)
+            InHook = false
+            if not okTarget or not part then return nil end
+
+            if isRaycast and type(args[2]) == "Vector3" then
+                args[3] = (part.Position - args[2]).Unit * 1000
+                return args
+            elseif isRay and typeof(args[2]) == "Ray" then
+                args[2] = Ray.new(args[2].Origin, (part.Position - args[2].Origin).Unit * 1000)
+                return args
+            end
+            return nil
+        end)
+
+        if okRedirect and newArgs then
+            return nm(table.unpack(newArgs))
+        end
         return nm(...)
     end)
 
