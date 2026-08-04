@@ -7,7 +7,7 @@ local Menu = Sections.Settings.Menu
 local Config = Sections.Settings.Config
 
 -- // make sure the config folder exists
-local ConfigFolder = "rocommand/"
+local ConfigFolder = "Lumia"
 if isfolder and makefolder then
     pcall(function()
         if not isfolder(ConfigFolder) then
@@ -29,7 +29,7 @@ pcall(function()
             end
         end
         if not hasCfg then
-            writefile(ConfigFolder .. "default.cfg", Window:saveconfig())
+            writefile(ConfigFolder .. "/default.cfg", Window:saveconfig())
         end
     end
 end)
@@ -101,7 +101,7 @@ Menu:toggle({
     callback = function(v)
         Watermark:toggle(v)
         if v then
-            Watermark:update({ ["Rocommand"] = "rocommand.tech" })
+            Watermark:update({ ["Lumia"] = "rocommand.tech" })
         end
     end
 })
@@ -153,3 +153,20 @@ Config:button({
         ResetConfig()
     end
 })
+
+-- // auto-load the last used config so settings persist between sessions
+local LastConfigFile = ConfigFolder .. "/.last"
+pcall(function()
+    if isfile and isfile(LastConfigFile) then
+        local ok, name = pcall(readfile, LastConfigFile)
+        if ok and name and name ~= "" then
+            name = name:gsub("%s+$", "")
+            local cfgFile = ConfigFolder .. "/" .. name .. ".cfg"
+            if isfile and isfile(cfgFile) then
+                pcall(function()
+                    Window:loadconfig(cfgFile)
+                end)
+            end
+        end
+    end
+end)
