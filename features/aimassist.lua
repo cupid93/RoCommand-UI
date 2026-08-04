@@ -153,7 +153,16 @@ table.insert(Connections, RunService.RenderStepped:Connect(function(dt)
     end
 
     if not HoldingKey then
-        if not Toggles.StickyAim then
+        if Toggles.StickyAim and CurrentTarget then
+            local char = CurrentTarget.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local part = char and char:FindFirstChild(Options.AimPart)
+            if char and hum and hum.Health > 0 and part then
+                AimAt(part, dt)
+            else
+                CurrentTarget = nil
+            end
+        else
             CurrentTarget = nil
         end
         return
