@@ -324,11 +324,36 @@ local function SetSelection(weapon, skin, wrap)
     LastApplied = {}
 end
 
+local function GetEquipped(weapon)
+    return _G.EquippedData[weapon] or {Skin = "Default", Wrap = "None"}
+end
+
+local function ClearAll()
+    for weapon in pairs(SkinLists) do
+        _G.EquippedData[weapon] = {Skin = "Default", Wrap = "None"}
+    end
+    LastApplied = {}
+end
+
+local function GetAssignments()
+    local lines = {}
+    for _, weapon in ipairs(Weapons) do
+        local info = _G.EquippedData[weapon] or {Skin = "Default", Wrap = "None"}
+        if info.Skin ~= "Default" or (info.Wrap and info.Wrap ~= "None") then
+            lines[#lines + 1] = weapon .. ": " .. info.Skin .. (info.Wrap and info.Wrap ~= "None" and (" [" .. info.Wrap .. "]") or "")
+        end
+    end
+    return lines
+end
+
 local module = {}
 module.Weapons = Weapons
 module.Wraps = WrapList
 module.GetSkins = GetSkins
 module.SetSelection = SetSelection
+module.GetEquipped = GetEquipped
+module.ClearAll = ClearAll
+module.GetAssignments = GetAssignments
 module.Unload = function()
     Toggles.SkinChanger = false
     if oldGetWrap and ClientViewModel then
