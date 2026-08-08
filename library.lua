@@ -1062,7 +1062,7 @@ function library:login(props)
 			Text = "",
 			TextColor3 = Color3.fromRGB(255,255,255),
 			TextSize = textsize,
-			TextXAlignment = "Left",
+			TextXAlignment = "Center",
 			ClearTextOnFocus = false,
 			Parent = inner
 		}
@@ -1082,7 +1082,7 @@ function library:login(props)
 			Text = "",
 			TextColor3 = Color3.fromRGB(255,255,255),
 			TextSize = textsize,
-			TextXAlignment = "Left",
+			TextXAlignment = "Center",
 			ClearTextOnFocus = false,
 			Parent = inner
 		}
@@ -1154,10 +1154,22 @@ function library:login(props)
 			return
 		end
 		local users = decoded.users or decoded
-		local entry = users[user]
-		local expected = entry
-		if type(entry) == "table" then
-			expected = entry.password or entry.pass
+		local expected = nil
+		if type(users) == "table" then
+			if type(users[1]) == "table" and users[1].username ~= nil then
+				for _, u in ipairs(users) do
+					if u.username == user then
+						expected = u.password or u.pass
+						break
+					end
+				end
+			else
+				local entry = users[user]
+				expected = entry
+				if type(entry) == "table" then
+					expected = entry.password or entry.pass
+				end
+			end
 		end
 		if expected and expected == pass then
 			loggedin = true
@@ -4393,7 +4405,7 @@ end
 --
 function sections:configloader(props)
 	-- // properties
-	local folder = props.folder or props.Folder
+	local folder = tostring(props.folder or props.Folder or ""):gsub("[/\\]+$", "")
 	-- // variables
 	local configloader = {}
 	-- // main
@@ -4802,25 +4814,49 @@ function sections:configloader(props)
 		return {textbox_holder,tbox,outline5}
 	end
 	--
+	local function marklast(name)
+		if name and writefile then
+			pcall(function()
+				writefile(folder .. "/.last", name)
+			end)
+		end
+	end
+	local function selectByName(name)
+		for _, b in ipairs(createdbuttons) do
+			if b.name == name then
+				b.grey.Visible = true
+				b.title.TextColor3 = self.library.theme.accent
+				table.insert(self.library.themeitems["accent"]["TextColor3"],b.title)
+				selected = b
+				return
+			end
+		end
+	end
+	--
 	local refresh = function()
+		local previous = selected and selected.name or nil
 		for i,v in pairs(createdbuttons) do
 			v.button:Remove()
 			v.grey:Remove()
 			v.title:Remove()
 		end
 		createdbuttons = {}
+		selected = nil
 		for i,v in pairs(listfiles(folder)) do
 			if v:sub(-4) == ".cfg" then
 				local name = v:gsub("\\", "/"):match("([^/]+)$")
 				name = name and name:sub(1, -5) or nil
 				if name then
-					if i == 1 then 
-						makebutton(name,true)
-					else
-						makebutton(name,false)
-					end
+					makebutton(name, previous and name == previous)
 				end
 			end
+		end
+		if not selected and createdbuttons[1] then
+			local firstBtn = createdbuttons[1]
+			firstBtn.grey.Visible = true
+			firstBtn.title.TextColor3 = self.library.theme.accent
+			table.insert(self.library.themeitems["accent"]["TextColor3"],firstBtn.title)
+			selected = firstBtn
 		end
 	end
 	--
@@ -4873,23 +4909,32 @@ function sections:configloader(props)
 	end)
 	--
 	load[3].MouseButton1Down:Connect(function()
-		self.library:loadconfig(folder..selected.name..".cfg")
+		if selected then
+			self.library:loadconfig(folder.."/"..selected.name..".cfg")
+			marklast(selected.name)
+		end
 		load[2].BorderColor3 = self.library.theme.accent
 		wait(0.05)
 		load[2].BorderColor3 = Color3.fromRGB(12,12,12)
 	end)
 	--
 	delete[3].MouseButton1Down:Connect(function()
-		delfile(folder..selected.name..".cfg")
+		if selected and delfile then
+			delfile(folder.."/"..selected.name..".cfg")
+		end
 		delete[2].BorderColor3 = self.library.theme.accent
 		wait(0.05)
 		delete[2].BorderColor3 = Color3.fromRGB(12,12,12)
 		wait()
 		refresh()
+		if selected then marklast(selected.name) end
 	end)
 	--
 	save[3].MouseButton1Down:Connect(function()
-		writefile(folder..selected.name..".cfg", self.library:saveconfig())
+		if selected then
+			writefile(folder.."/"..selected.name..".cfg", self.library:saveconfig())
+			marklast(selected.name)
+		end
 		save[2].BorderColor3 = self.library.theme.accent
 		wait(0.05)
 		save[2].BorderColor3 = Color3.fromRGB(12,12,12)
@@ -4898,12 +4943,16 @@ function sections:configloader(props)
 	end)
 	--
 	create[3].MouseButton1Down:Connect(function()
-		writefile(folder..currentname..".cfg", self.library:saveconfig())
+		if currentname then
+			writefile(folder.."/"..currentname..".cfg", self.library:saveconfig())
+			marklast(currentname)
+		end
 		create[2].BorderColor3 = self.library.theme.accent
 		wait(0.05)
 		create[2].BorderColor3 = Color3.fromRGB(12,12,12)
 		wait()
 		refresh()
+		if currentname then selectByName(currentname) end
 	end)
 	-- // button tbl
 	configloader = {
