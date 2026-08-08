@@ -28,11 +28,15 @@ local function TryInstall()
     if Installed then return true end
 
     pcall(function()
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        Modules = require(ReplicatedStorage:WaitForChild("Modules"))
+        local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts")
+        local controllers = PlayerScripts:FindFirstChild("Controllers")
+        local fc = controllers and controllers:FindFirstChild("FighterController")
+        if fc then
+            Modules = require(fc)
+        end
     end)
 
-    if not Modules or not Modules.FighterController or type(Modules.FighterController.GetFighter) ~= "function" then
+    if not Modules or type(Modules.GetFighter) ~= "function" then
         print("[Weapons] FighterController not found, retrying while enabled")
         return false
     end
@@ -47,7 +51,7 @@ table.insert(Connections, RunService.Heartbeat:Connect(function()
         if not Installed then return end
     end
 
-    local fighter = Modules.FighterController:GetFighter(LocalPlayer)
+    local fighter = Modules:GetFighter(LocalPlayer)
     if not fighter then return end
 
     local item = fighter.EquippedItem
@@ -118,7 +122,7 @@ return {
         end
         if Installed then
             pcall(function()
-                local fighter = Modules.FighterController:GetFighter(LocalPlayer)
+    local fighter = Modules:GetFighter(LocalPlayer)
                 if fighter and fighter.EquippedItem then
                     local item = fighter.EquippedItem
                     if item.Info and Originals[item] then
