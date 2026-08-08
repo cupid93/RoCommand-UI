@@ -14,18 +14,49 @@ getgenv().Connections = Connections
 -- // character ref, kept fresh on respawn
 local LocalChar = LocalPlayer.Character
 
--- // FOV Circle
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1
-FOVCircle.NumSides = 64
-FOVCircle.Filled = false
-FOVCircle.Visible = false
-FOVCircle.ZIndex = 999
-FOVCircle.Transparency = 0
+-- // FOV Circle (ScreenGui Frame — no Drawing dependency)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "rocommandSilentFOV"
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local FovFrame = Instance.new("Frame")
+FovFrame.Name = "FovFrame"
+FovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+FovFrame.Position = UDim2.fromScale(0.5, 0.5)
+FovFrame.Size = UDim2.new(1, 0, 1, 0)
+FovFrame.BackgroundTransparency = 1
+FovFrame.BorderSizePixel = 0
+FovFrame.ZIndex = 1
+FovFrame.Parent = ScreenGui
+
+local FovCircle = Instance.new("Frame")
+FovCircle.Name = "FovCircle"
+FovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+FovCircle.BackgroundTransparency = 1
+FovCircle.BorderSizePixel = 0
+FovCircle.Size = UDim2.fromOffset(0, 0)
+FovCircle.Visible = false
+FovCircle.ZIndex = 2
+FovCircle.Parent = FovFrame
+
+local FovCorner = Instance.new("UICorner")
+FovCorner.CornerRadius = UDim.new(1, 0)
+FovCorner.Parent = FovCircle
+
+local FovStroke = Instance.new("UIStroke")
+FovStroke.Thickness = 1
+FovStroke.Color = Color3.fromRGB(33, 150, 243)
+FovStroke.Transparency = 0
+FovStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+FovStroke.Parent = FovCircle
 
 local Modules = nil
 local Installed = false
 local OriginalStartShooting = nil
+local WarnedNoUtility = false
 
 -- // shared target state (mirrors testfile states.target / target_part)
 local State = {
@@ -46,14 +77,14 @@ end
 ]]
 local WallCheckCache = {}
 local WallCheckTTL = 0.15
-local RaycastParams = RaycastParams.new()
-RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
-RaycastParams.IgnoreWater = true
-RaycastParams.FilterDescendantsInstances = { LocalChar }
+local WallRayParams = RaycastParams.new()
+WallRayParams.FilterType = Enum.RaycastFilterType.Exclude
+WallRayParams.IgnoreWater = true
+WallRayParams.FilterDescendantsInstances = { LocalChar }
 
 LocalPlayer.CharacterAdded:Connect(function(char)
     LocalChar = char
-    RaycastParams.FilterDescendantsInstances = { char }
+    WallRayParams.FilterDescendantsInstances = { char }
 end)
 
 local function WallCheck(character, part)
@@ -74,7 +105,7 @@ local function WallCheck(character, part)
     end
 
     local origin = Camera.CFrame.Position
-    local result = workspace:Raycast(origin, part.Position - origin, RaycastParams)
+    local result = workspace:Raycast(origin, part.Position - origin, WallRayParams)
     local passed = not result or result.Instance:IsDescendantOf(character)
 
     char_cache[part] = {
@@ -373,7 +404,7 @@ local function CreateManipVisualizer()
     if not root then return end
 
     ManipVisualizer = Instance.new("Part")
-    ManipVisualizer.Name = "LumiaManip"
+    ManipVisualizer.Name = "rocommandManip"
     ManipVisualizer.Material = Enum.Material.Neon
     ManipVisualizer.Size = root.Size
     ManipVisualizer.Color = Color3.fromRGB(0, 255, 255)
@@ -486,6 +517,10 @@ end))
 ]]
 local function BuildShotPayload(origin, target, part)
     if not Modules or not Modules.Utility or type(Modules.Utility.EncodeCFrame) ~= "function" then
+        if not WarnedNoUtility then
+            WarnedNoUtility = true
+            print("[SilentAim] Utility/EncodeCFrame missing — cannot build shot payload")
+        end
         return nil
     end
 
@@ -503,12 +538,84 @@ end
 local function TryInstall()
     if Installed then return true end
 
+    local install_source = nil
+
     pcall(function()
-        Modules = require(ReplicatedStorage:WaitForChild("Modules"))
+        local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts")
+        local controllers = PlayerScripts:FindFirstChild("Controllers")
+        local fc = controllers and controllers:FindFirstChild("FighterController")
+        local pModules = PlayerScripts:FindFirstChild("Modules")
+        local rModules = ReplicatedStorage:FindFirstChild("Modules")
+
+        local Gun, Utility
+
+        local utilMod = rModules and rModules:FindFirstChild("Utility")
+        if utilMod then
+            local okU, errU = pcall(function()
+                Utility = require(utilMod)
+            end)
+            if not okU then
+                print("[SilentAim] require(Utility) error: " .. tostring(errU))
+            end
+        else
+            print("[SilentAim] ReplicatedStorage.Modules.Utility not found")
+        end
+
+        -- // path 1: require ItemTypes.Gun (testfile layout)
+        local itemTypes = pModules and pModules:FindFirstChild("ItemTypes")
+        local gunMod = itemTypes and itemTypes:FindFirstChild("Gun")
+        if gunMod then
+            local okG, errG = pcall(function()
+                Gun = require(gunMod)
+            end)
+            if not okG then
+                print("[SilentAim] require(ItemTypes.Gun) error: " .. tostring(errG))
+            end
+            if Gun and type(Gun.StartShooting) == "function" then
+                install_source = "require(ItemTypes.Gun)"
+            end
+        else
+            print("[SilentAim] PlayerScripts.Modules.ItemTypes.Gun not found")
+        end
+
+        -- // path 2: derive the Gun class from the equipped weapon — same mechanism
+        -- // weapons.lua uses (GetFighter + EquippedItem), so it works wherever weapons works
+        if (not Gun or type(Gun.StartShooting) ~= "function") and fc then
+            pcall(function()
+                local okF, errF = pcall(function()
+                    local Fighter = require(fc)
+                    local fighter = Fighter:GetFighter(LocalPlayer)
+                    local item = fighter and fighter.EquippedItem
+                    if item then
+                        local cls = getmetatable(item)
+                        local depth = 0
+                        while type(cls) == "table" and cls.__index and depth < 8 do
+                            local next_cls = cls.__index
+                            cls = type(next_cls) == "table" and next_cls or nil
+                            depth = depth + 1
+                            if cls and type(cls.StartShooting) == "function" then
+                                break
+                            end
+                        end
+                        if cls and type(cls.StartShooting) == "function" then
+                            Gun = cls
+                            install_source = "equipped item class"
+                        end
+                    end
+                end)
+                if not okF then
+                    print("[SilentAim] equipped-item path error: " .. tostring(errF))
+                end
+            end)
+        end
+
+        if Gun and type(Gun.StartShooting) == "function" then
+            Modules = { Gun = Gun, Utility = Utility }
+        end
     end)
 
     if not Modules or type(Modules.Gun) ~= "table" or type(Modules.Gun.StartShooting) ~= "function" then
-        print("[SilentAim] Gun module not found, retrying while enabled")
+        print("[SilentAim] Gun.StartShooting not found (tried require + equipped item class), retrying while enabled")
         return false
     end
 
@@ -516,6 +623,7 @@ local function TryInstall()
 
     OriginalStartShooting = Modules.Gun.StartShooting
     Modules.Gun.StartShooting = function(self, ...)
+        local args = table.pack(...)
         local ok, results = pcall(function()
             if not self or not self.ClientFighter or not self.ClientFighter.IsLocalPlayer then
                 return nil
@@ -526,7 +634,7 @@ local function TryInstall()
                 return nil
             end
 
-            local shot_results = {OriginalStartShooting(self, ...)}
+            local shot_results = {OriginalStartShooting(self, table.unpack(args, 1, args.n))}
             if shot_results[1] ~= true or shot_results[2] ~= "StartShooting" then
                 return shot_results
             end
@@ -567,11 +675,11 @@ local function TryInstall()
         if ok and type(results) == "table" then
             return table.unpack(results)
         end
-        return OriginalStartShooting(self, ...)
+        return OriginalStartShooting(self, table.unpack(args, 1, args.n))
     end
 
     Installed = true
-    print("[SilentAim] Gun.StartShooting hooked")
+    print("[SilentAim] Gun.StartShooting hooked via " .. tostring(install_source))
     return true
 end
 
@@ -597,22 +705,29 @@ end))
 
 -- // target tracking + FOV circle
 table.insert(Connections, RunService.RenderStepped:Connect(function()
+    if not Camera then
+        Camera = workspace.CurrentCamera
+    end
+    if not Camera then
+        return
+    end
+
     local now = os.clock()
 
     if not (Toggles.SilentAim or Toggles.ShowSilentFOV) then
         if CurrentPlayer then
             ClearTarget()
         end
-        FOVCircle.Visible = false
+        FovCircle.Visible = false
         return
     end
 
-    FOVCircle.Position = Camera.ViewportSize / 2
-    FOVCircle.Radius = Options.SilentFOV or 150
-    FOVCircle.Color = Options.SilentFOVColor or Color3.fromRGB(33, 150, 243)
-    FOVCircle.Thickness = Options.SilentFOVThickness or 1
-    FOVCircle.Transparency = 0
-    FOVCircle.Visible = Toggles.ShowSilentFOV
+    FovCircle.Position = UDim2.fromOffset(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local radius = Options.SilentFOV or 150
+    FovCircle.Size = UDim2.fromOffset(radius * 2, radius * 2)
+    FovStroke.Thickness = Options.SilentFOVThickness or 1
+    FovStroke.Color = Options.SilentFOVColor or Color3.fromRGB(33, 150, 243)
+    FovCircle.Visible = Toggles.ShowSilentFOV
 
     if State.target_part and State.target_part.Parent then
         UpdateTargetPosition()
@@ -699,8 +814,7 @@ return {
         end)
 
         pcall(function()
-            FOVCircle.Visible = false
-            FOVCircle:Remove()
+            ScreenGui:Destroy()
         end)
 
         if Installed and Modules and Modules.Gun and OriginalStartShooting then
